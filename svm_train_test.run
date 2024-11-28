@@ -1,0 +1,72 @@
+# OTDM Lab 2: run file for training and testing of the SVM model
+# Emilien L'Haridon, Gatien Dupont
+
+# To run this file : 
+# in ampl : include svm_train_test.run;
+
+# -------------------- TRAIN --------------------
+
+# Solve the primal
+reset;
+print "First, we solve the primal problem.";
+print "Running svm_primal.mod with dataset2000.dat";
+
+model svm_primal.mod;
+data "data/dataset2000.dat";
+
+option solver cplex;
+
+problem SVM_PRIMAL: w, gamma, s, primal, c1, c2;
+solve SVM_PRIMAL;
+display w, gamma, s > out/primal_results.txt;
+
+# Solve the dual
+reset;
+print "Now, we solve the dual problem.";
+print "Running svm_dual.mod with dataset2000.dat";
+
+model svm_dual.mod;
+data "data/dataset2000.dat";
+
+option solver cplex;
+
+problem SVM_DUAL: lambda, dual, c1;
+solve SVM_DUAL;
+display lambda > out/dual_results.txt;
+
+print "Computing w and gamma from the dual solution.";
+# Compute w, gamma from the dual solution
+param w {1..n};
+let {j in {1..n}} w[j] := sum{i in {1..m}} lambda[i]*y_train[i]*A_train[i,j];
+display w > out/computed_w.txt;
+
+param gamma;
+for {i in {1..m}} {
+    if lambda[i] > 0.01 and lambda[i] < nu*0.99 then {
+        # A support vector point was found
+        let gamma := 1/y_train[i] - sum{j in {1..n}} w[j]*A_train[i,j];
+        break;
+    }
+}
+display gamma > out/computed_gamma.txt;
+print "w and gamma computed.";
+
+# -------------------- TEST --------------------
+print "Now, we test the model with the test dataset.";
+# Predict values with the test dataset
+param y_pred {1..m};
+let {i in {1..m}} y_pred[i] := gamma + sum{j in {1..n}}w[j]*A_test[i,j];
+let {i in {1..m}} y_pred[i] := if y_pred[i] <= 0 then -1 else 1;
+display y_pred > out/predictions.txt;
+
+# Check misclassifications
+param misclassifications default 0;
+for {i in {1..m}} {
+    if y_pred[i] != y_test[i] then
+        let misclassifications := misclassifications + 1;
+}
+
+display misclassifications > out/misclassifications.txt;
+param accuracy = (m - misclassifications) / m;
+display accuracy > out/accuracy.txt;
+print "Accuracy: ", accuracy;
