@@ -1,2 +1,6 @@
 /ampl_linux-intel64
 gensvmdat
+/out/*
+!/out/combined_results100.txt
+!/out/combined_results2000.txt
+!/out/combined_resultsbank.txt

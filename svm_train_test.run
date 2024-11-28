@@ -1,4 +1,4 @@
-# OTDM Lab 2: run file for training and testing of the SVM model
+# OTDM Lab 2: run file
 # Emilien L'Haridon, Gatien Dupont
 
 # To run this file : 
@@ -9,10 +9,10 @@
 # Solve the primal
 reset;
 print "First, we solve the primal problem.";
-print "Running svm_primal.mod with dataset2000.dat";
+print "Running svm_primal.mod with universalbank.dat";
 
 model svm_primal.mod;
-data "data/dataset2000.dat";
+data "data/universalbank.dat";
 
 option solver cplex;
 
@@ -23,10 +23,10 @@ display w, gamma, s > out/primal_results.txt;
 # Solve the dual
 reset;
 print "Now, we solve the dual problem.";
-print "Running svm_dual.mod with dataset2000.dat";
+print "Running svm_dual.mod with universalbank.dat";
 
 model svm_dual.mod;
-data "data/dataset2000.dat";
+data "data/universalbank.dat";
 
 option solver cplex;
 
@@ -40,13 +40,22 @@ param w {1..n};
 let {j in {1..n}} w[j] := sum{i in {1..m}} lambda[i]*y_train[i]*A_train[i,j];
 display w > out/computed_w.txt;
 
+# Debugging: Display lambda values and check range
+display lambda > out/lambda_values.txt;
+
 param gamma;
+param support_vector_found default 0;
 for {i in {1..m}} {
-    if lambda[i] > 0.01 and lambda[i] < nu*0.99 then {
+    if lambda[i] > 0.001 and lambda[i] < nu*0.999 then {
         # A support vector point was found
         let gamma := 1/y_train[i] - sum{j in {1..n}} w[j]*A_train[i,j];
+        let support_vector_found := 1;
         break;
     }
+}
+display support_vector_found > out/support_vector_found.txt;
+if support_vector_found = 0 then {
+    print "No support vector point found within the specified range.";
 }
 display gamma > out/computed_gamma.txt;
 print "w and gamma computed.";
@@ -55,7 +64,7 @@ print "w and gamma computed.";
 print "Now, we test the model with the test dataset.";
 # Predict values with the test dataset
 param y_pred {1..m};
-let {i in {1..m}} y_pred[i] := gamma + sum{j in {1..n}}w[j]*A_test[i,j];
+let {i in {1..m}} y_pred[i] := gamma + sum{j in {1..n}} w[j]*A_test[i,j];
 let {i in {1..m}} y_pred[i] := if y_pred[i] <= 0 then -1 else 1;
 display y_pred > out/predictions.txt;
 
